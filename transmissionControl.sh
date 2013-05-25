@@ -2,54 +2,33 @@
 ####################################################################################
 ####################################################################################
 # A Transmission (http://www.transmissionbt.com/) script that 
-# will vary the download and upload speed limits based on the
+# will set alternate speed limits ON/OFF based on the
 # number of hosts currently active on the LAN.
 #
-# Very usefull when installed in a mediabox that when being the
-# only host will set no up/down limits but when a shared connection
-# will limit to not overload the network
-# 
-# Author:
+# An adaptation on the script from:
 # Jaime Bosque jaboto(at)gmail(dot)com
-#
-# This script is based in a previous work from the author plus
-# - Miguel Mtz (aka) Xarmaz
-# - aRDi
-# - tazok de esdebian.org
 #
 # Requirements:
 # transmission-remote, transmission, grep, nmap, cron 
 #
 ####################################################################################
 ####################################################################################
-
 #-----------------------------------------------------------------------------------
 # Transmission and network vars.
 # -hosts should be 2 if you are using typical network config (router + mediabox) 
 #  but may  vary if is in the same box or you have an always-active host
 #-----------------------------------------------------------------------------------
 transmission=/usr/bin/transmission-daemon
-config_file=/home/kets/Transmission-script/settings.json
+config_file=/etc/transmission-daemon/settings.json
 t_remote=/usr/bin/transmission-remote
 user=transmission
 pass=transmission
 lan=192.168.1
 server=localhost
 port=9091
-log=/home/kets/Transmission-script/transmission_limits.log
+log=/home/selex/Playground/log/transmission_limits.log
 hosts=2
 DEBUG=1
-#-----------------------------------------------------------------------------------
-# Specific rate settins according to the lan usage
-# 0 as unlimmited no longer works, use a high value or improve the script to
-# work sending the command -U for unlimited upload an -D for downloads
-# -solo_(up|donw) settings for when just this machine is in lan
-# -shared_(up|down) settings for when more that this machine are in lan
-#-----------------------------------------------------------------------------------
-solo_down=4000
-solo_up=4000
-shared_down=5
-shared_up=5
 
 # Detect if transmission is running
 running=`pidof transmission-daemon | wc -l`
@@ -62,46 +41,38 @@ if [ "$running" == "1" ]; then
     hosts_up_before=`tail -n1 $log | grep -o -E "H[0-9]+" | grep -o -E [0-9]+`
     if [ -z "$hosts_up_before" ]; then hosts_up_before=0; fi
 
-
     # When DEBUG, always change things
     if [ "$DEBUG" -eq "1" ]; then
-        if [ "$hosts_up" -gt "$hosts" ]; then
-            down_limit=$shared_down
-            up_limit=$shared_up
-        else
-            down_limit=$solo_down
-            up_limit=$solo_up
-        fi
         echo "DEBUG: Found $hosts_up";
         echo "DEBUG: Host to trigger $hosts_up";
-        echo "DEBUG: Setting limits $down_limit and $up_limit "
-        $t_remote $server:$port -n $user:$pass -d $down_limit
-        $t_remote $server:$port -n $user:$pass -u $up_limit
+        if [ "$hosts_up" -gt "$hosts" ]; then
+            $t_remote $server:$port -n $user:$pass -as
+            echo "DEBUG: Setting turtle mode (alternate speed ON) "
+        else
+            $t_remote $server:$port -n $user:$pass -AS
+            echo "DEBUG: Unsetting turtle mode (alternate speed OFF) "
+        fi
     fi
 
     # If something has changed in the lan update limits
     #echo "Hosts up $hosts_up  vs $hosts_up_before"
     if [ "$hosts_up" -ne "$hosts_up_before" ]; then
         if [ "$hosts_up" -gt "$hosts" ]; then
-            down_limit=$shared_down
-            up_limit=$shared_up
+            $t_remote $server:$port -n $user:$pass -as
+            echo `date +"%d/%m/%y -- %H:%M"` "S$running H$hosts_up turtle:ON P$pid" >> $log
         else
-            down_limit=$solo_down
-            up_limit=$solo_up
+            $t_remote $server:$port -n $user:$pass -AS
+            echo `date +"%d/%m/%y -- %H:%M"` "S$running H$hosts_up turtle:OFF P$pid" >> $log
         fi
-        $t_remote $server:$port -n $user:$pass -d $down_limit
-        $t_remote $server:$port -n $user:$pass -u $up_limit
 
         #Log that changes were done!
-        echo `date +"%d/%m/%y -- %H:%M"` "S$running H$hosts_up U$up_limit D$down_limit P$pid" >> $log
     fi
 else
     # Log that daemon is not running :_(
-    echo `date +"%d/%m/%y -- %H:%M"` "Transmission-daemon is not running!" >> $log	
+    echo `date +"%d/%m/%y -- %H:%M"` "Transmission-daemon is not running!" >> $log
 
     # Start transmission daemon with the specified config file
     $transmission -g $config_file
     echo `date +"%d/%m/%y -- %H:%M"` "Transmission-daemon was lunched!" >> $log
-fi	
+fi
 exit 0
-
