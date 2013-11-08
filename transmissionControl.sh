@@ -14,7 +14,7 @@
 ####################################################################################
 ####################################################################################
 #-----------------------------------------------------------------------------------
-# Transmission and network vars.
+# Transmission and network variables.
 # -hosts should be 2 if you are using typical network config (router + mediabox) 
 #  but may  vary if is in the same box or you have an always-active host
 #-----------------------------------------------------------------------------------
